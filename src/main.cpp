@@ -59,77 +59,96 @@ auto main(int argc, char** argv) noexcept -> int {
             continue;
         }
 
-        std::string content((std::istreambuf_iterator<char>(infile)),
-                            std::istreambuf_iterator<char>());
-        infile.close();
+        infile.close(); // Close input file after isBinary check
 
-        auto [processed_content, removed_emoji_count] = removeEmojis(content);
+        std::string line;
+        int total_removed_emoji_count = 0;
+        std::ofstream temp_outfile;
+        fs::path temp_file_path; // Declare here for broader scope
 
-        if (dry_run) {
-            if (removed_emoji_count > 0) {
-                std::cout << "File: " << file_path << ", Emojis removed: " << removed_emoji_count << "\n";
-            } else {
-                std::cout << "File: " << file_path << ", No emojis found.\n";
-            }
-        } else if (in_place) {
-            fs::path backup_path = file_path;
-            backup_path += backup_extension;
-
-            // Generate a unique temporary file path
+        if (in_place) {
             fs::path temp_dir = fs::temp_directory_path();
             std::string temp_filename = file_path.filename().string() + ".nej_tmp";
-            fs::path temp_file_path = temp_dir / temp_filename;
+            temp_file_path = temp_dir / temp_filename;
 
-            // Ensure the temporary filename is unique
             int counter = 0;
             while (fs::exists(temp_file_path)) {
                 counter++;
                 temp_file_path = temp_dir / (temp_filename + std::to_string(counter));
             }
 
-            // Write processed content to the temporary file
-            std::ofstream temp_outfile(temp_file_path);
+            temp_outfile.open(temp_file_path);
             if (!temp_outfile.is_open()) {
                 std::cerr << "Error: Could not open temporary file for writing: " << temp_file_path << "\n";
                 continue;
             }
-            temp_outfile << processed_content;
-            temp_outfile.close();
+        }
 
-            // Check if the temporary file write was successful
-            if (!fs::exists(temp_file_path) || fs::file_size(temp_file_path) != processed_content.length()) {
-                std::cerr << "Error: Failed to write complete content to temporary file: " << temp_file_path << "\n";
-                fs::remove(temp_file_path); // Clean up incomplete temp file
+        // Reopen infile for line-by-line reading
+        infile.open(file_path);
+        if (!infile.is_open()) {
+            std::cerr << "Error: Could not re-open file for reading: " << file_path << "\n";
+            if (in_place) {
+                fs::remove(temp_file_path); // Clean up temp file if created
+            }
+            continue;
+        }
+
+        while (std::getline(infile, line)) {
+            auto [processed_line, removed_emoji_count] = removeEmojis(line);
+            total_removed_emoji_count += removed_emoji_count;
+
+            if (!dry_run) {
+                if (in_place) {
+                    temp_outfile << processed_line << '\n';
+                } else {
+                    std::cout << processed_line << '\n';
+                }
+            }
+        }
+        infile.close(); // Close input file after processing
+
+        if (in_place) {
+            temp_outfile.close(); // Close temp output file
+
+            if (!fs::exists(temp_file_path)) {
+                std::cerr << "Error: Temporary file was not created or is empty: " << temp_file_path << "\n";
                 continue;
             }
 
             std::error_code ec;
 
-            // Rename original file to backup
+            fs::path backup_path = file_path;
+            backup_path += backup_extension;
+
             fs::rename(file_path, backup_path, ec);
             if (ec) {
                 std::cerr << "Error: Could not create backup file for " << file_path << ": "
                           << ec.message() << "\n";
-                fs::remove(temp_file_path); // Clean up temp file
+                fs::remove(temp_file_path);
                 continue;
             }
 
-            // Rename temporary file to original file path
             fs::rename(temp_file_path, file_path, ec);
             if (ec) {
                 std::cerr << "Error: Could not rename temporary file to original: " << file_path << ": "
                           << ec.message() << "\n";
-                // Attempt to restore original file from backup if renaming fails
                 fs::rename(backup_path, file_path, ec);
                 if (ec) {
                     std::cerr << "Error: Could not restore original file from backup " << backup_path << ": "
                               << ec.message() << "\n";
                 }
-                fs::remove(temp_file_path); // Clean up temp file
+                fs::remove(temp_file_path);
                 continue;
             }
-        } else {
-            std::cout << processed_content;
+        }
+
+        if (dry_run) {
+            if (total_removed_emoji_count > 0) {
+                std::cout << "File: " << file_path << ", Emojis removed: " << total_removed_emoji_count << "\n";
+            } else {
+                std::cout << "File: " << file_path << ", No emojis found.\n";
+            }
         }
     }
 
