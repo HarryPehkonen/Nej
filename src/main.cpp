@@ -1,10 +1,17 @@
 #include <CLI/CLI.hpp>  // Include CLI11 header
 #include <algorithm>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
+
+#ifdef _WIN32
+#include <process.h>
+#else
+#include <unistd.h>
+#endif
 
 #include "core.h"  // Include core functions
 
@@ -67,15 +74,15 @@ auto main(int argc, char** argv) noexcept -> int {
         fs::path temp_file_path; // Declare here for broader scope
 
         if (in_place) {
-            fs::path temp_dir = fs::temp_directory_path();
-            std::string temp_filename = file_path.filename().string() + ".nej_tmp";
-            temp_file_path = temp_dir / temp_filename;
-
-            int counter = 0;
-            while (fs::exists(temp_file_path)) {
-                counter++;
-                temp_file_path = temp_dir / (temp_filename + std::to_string(counter));
-            }
+            // Generate unique temporary filename with PID and timestamp in same directory as original file
+            auto timestamp = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+#ifdef _WIN32
+            int pid = _getpid();
+#else
+            pid_t pid = getpid();
+#endif
+            std::string temp_filename = file_path.filename().string() + "." + std::to_string(pid) + "." + std::to_string(timestamp) + ".nej_tmp";
+            temp_file_path = file_path.parent_path() / temp_filename;
 
             temp_outfile.open(temp_file_path);
             if (!temp_outfile.is_open()) {
@@ -118,8 +125,12 @@ auto main(int argc, char** argv) noexcept -> int {
 
             std::error_code ec;
 
-            fs::path backup_path = file_path;
-            backup_path += backup_extension;
+            // Create unique backup path with incrementing counter if needed
+            fs::path backup_path = file_path.string() + backup_extension;
+            int counter = 1;
+            while (fs::exists(backup_path)) {
+                backup_path = file_path.string() + backup_extension + std::to_string(counter++);
+            }
 
             fs::rename(file_path, backup_path, ec);
             if (ec) {

@@ -6,6 +6,7 @@
 #include <set>
 #include <vector>
 #include <string>
+#include <utf8.h>
 
 namespace fs = std::filesystem;
 
