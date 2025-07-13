@@ -240,6 +240,9 @@ clang-tidy src/*.cpp tests/*.cpp -- -I src
 
 ## Technical Details
 
+### Data Source
+- https://unicode.org/Public/emoji/16.0/
+
 ### Dependencies
 - **CLI11**: Command-line argument parsing (fetched automatically)
 - **UTF8-CPP**: UTF-8 encoding/decoding (fetched automatically)
