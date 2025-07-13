@@ -1,0 +1,8 @@
+# Example .clang-format configuration
+# This will be refined based on project needs.
+BasedOnStyle: Google
+IndentWidth: 4
+UseTab: Never
+BreakBeforeBraces: Attach
+AllowShortIfStatementsOnASingleLine: false
+ColumnLimit: 100

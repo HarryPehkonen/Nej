@@ -1,0 +1,5 @@
+# Example .clang-tidy configuration
+# This will be refined based on project needs.
+Checks: 'clang-diagnostic-*,clang-analyzer-*,modernize-*,readability-*,performance-*,bugprone-*,cppcoreguidelines-*'
+WarningsAsErrors: ''
+HeaderFilterRegex: '.*'
