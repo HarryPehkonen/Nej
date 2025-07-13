@@ -126,7 +126,8 @@ auto main(int argc, char** argv) noexcept -> int {
             std::error_code ec;
 
             // Create unique backup path with incrementing counter if needed
-            fs::path backup_path = file_path.string() + backup_extension;
+            fs::path backup_path = file_path;
+            backup_path += backup_extension;
             int counter = 1;
             while (fs::exists(backup_path)) {
                 backup_path = file_path.string() + backup_extension + std::to_string(counter++);
