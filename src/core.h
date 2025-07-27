@@ -1,12 +1,13 @@
 #ifndef NEJ_CORE_H
 #define NEJ_CORE_H
 
+#include <utf8.h>
+
 #include <cstdint>
 #include <filesystem>
 #include <set>
-#include <vector>
 #include <string>
-#include <utf8.h>
+#include <vector>
 
 namespace fs = std::filesystem;
 

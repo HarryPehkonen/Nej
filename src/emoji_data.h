@@ -4795,7 +4795,6 @@ const std::set<std::vector<uint32_t>> EMOJI_SEQUENCES = {
     {0x1FAF8, 0x1F3FC},
     {0x1FAF8, 0x1F3FD},
     {0x1FAF8, 0x1F3FE},
-    {0x1FAF8, 0x1F3FF}
-};
+    {0x1FAF8, 0x1F3FF}};
 
 #endif  // NEJ_EMOJI_DATA_H

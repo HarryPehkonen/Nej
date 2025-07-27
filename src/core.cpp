@@ -2,15 +2,14 @@
 
 #include <algorithm>
 #include <fstream>
-#include <vector>
-#include <utility> // For std::pair
 #include <iterator>
+#include <utility>  // For std::pair
+#include <vector>
 
 #include "emoji_data.h"
 
 // Constants for file processing
-const size_t FILE_BUFFER_SIZE = 4096; // Check first 4KB
-
+const size_t FILE_BUFFER_SIZE = 4096;  // Check first 4KB
 
 // Function to check if a file is likely binary
 auto isBinary(const fs::path& file_path) -> bool {
@@ -35,7 +34,7 @@ auto isBinary(const fs::path& file_path) -> bool {
 auto removeEmojis(const std::string& text) -> std::pair<std::string, int> {
     std::string result;
     int removed_emoji_count = 0;
-    
+
     auto it = text.begin();
     auto end = text.end();
 

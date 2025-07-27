@@ -1,4 +1,3 @@
-#include <CLI/CLI.hpp>  // Include CLI11 header
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
@@ -6,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <functional>
 
 #ifdef _WIN32
 #include <process.h>
@@ -13,43 +13,93 @@
 #include <unistd.h>
 #endif
 
-#include "core.h"  // Include core functions
+#include "core.h"
 
 namespace fs = std::filesystem;
 
-auto main(int argc, char** argv) noexcept -> int {
-    CLI::App app{"Nej - No EmoJis: A command-line tool for removing emojis from text files"};
+void show_help(const char* program_name) {
+    std::cout << "Nej - No EmoJis: A command-line tool for removing emojis from text files\n\n";
+    std::cout << "Usage: " << program_name << " [OPTIONS] FILES...\n\n";
+    std::cout << "Arguments:\n";
+    std::cout << "  FILES                    Input text files to process\n\n";
+    std::cout << "Options:\n";
+    std::cout << "  -i, --in-place          Perform in-place editing with no backup\n";
+    std::cout << "  --backup-ext EXT        Backup extension for in-place editing (e.g., .bak)\n";
+    std::cout << "  --dry-run               Report changes without modifying files\n";
+    std::cout << "  -h, --help              Show this help message and exit\n\n";
+    std::cout << "Examples:\n";
+    std::cout << "  " << program_name << " file.txt                    # Output to stdout\n";
+    std::cout << "  " << program_name << " -i file.txt                 # In-place, no backup\n";
+    std::cout << "  " << program_name << " -i --backup-ext .bak file.txt  # In-place with backup\n";
+    std::cout << "  " << program_name << " --dry-run *.txt             # Preview changes\n";
+}
 
-    std::vector<std::string> input_files_str;
-    app.add_option("files", input_files_str, "Input text files to process")
-        ->required()
-        ->check(CLI::ExistingFile);
-
-    std::string backup_extension;
+struct Arguments {
+    std::vector<std::string> files;
     bool in_place = false;
+    std::string backup_extension;
     bool dry_run = false;
-    auto *in_place_option =
-        app.add_option(
-               "-i,--in-place",
-               backup_extension,
-               "Perform in-place editing. Optionally specify backup extension (e.g., -i.bak)")
-            ->option_text("EXT")
-            ->expected(0, 1);
+    bool help = false;
+};
 
-    app.add_flag("--dry-run", dry_run, "Report changes without modifying files.");
+Arguments parse_arguments(int argc, char** argv) {
+    Arguments args;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "-h" || arg == "--help") {
+            args.help = true;
+        } else if (arg == "-i" || arg == "--in-place") {
+            args.in_place = true;
+        } else if (arg.length() > 2 && arg.substr(0, 2) == "-i") {
+            // Handle -i.bak syntax for backward compatibility
+            args.in_place = true;
+            args.backup_extension = arg.substr(2); // Extract everything after "-i"
+            if (!args.backup_extension.empty() && args.backup_extension[0] != '.') {
+                std::cerr << "Error: Backup extension must start with '.' (e.g., .bak)\n";
+                exit(1);
+            }
+        } else if (arg == "--backup-ext") {
+            if (i + 1 < argc) {
+                args.backup_extension = argv[++i];
+                if (!args.backup_extension.empty() && args.backup_extension[0] != '.') {
+                    std::cerr << "Error: Backup extension must start with '.' (e.g., .bak)\n";
+                    exit(1);
+                }
+            } else {
+                std::cerr << "Error: --backup-ext requires an argument\n";
+                exit(1);
+            }
+        } else if (arg == "--dry-run") {
+            args.dry_run = true;
+        } else if (!arg.empty() && arg[0] == '-') {
+            std::cerr << "Error: Unknown option '" << arg << "'\n";
+            std::cerr << "Try '" << argv[0] << " --help' for more information.\n";
+            exit(1);
+        } else {
+            args.files.push_back(arg);
+        }
+    }
+    
+    return args;
+}
 
-    try {
-        app.parse(argc, argv);
-    } catch (const CLI::ParseError& e) {
-        return app.exit(e);
+auto main(int argc, char** argv) noexcept -> int {
+    Arguments args = parse_arguments(argc, argv);
+    
+    if (args.help) {
+        show_help(argv[0]);
+        return 0;
+    }
+    
+    if (args.files.empty()) {
+        std::cerr << "Error: No input files specified\n";
+        std::cerr << "Try '" << argv[0] << " --help' for more information.\n";
+        return 1;
     }
 
-    if (in_place_option->count() > 0) {
-        in_place = true;
-        // backup_extension is already set by CLI11 if provided, empty if not
-    }
-
-    for (const auto& file_path_str : input_files_str) {
+    for (const auto& file_path_str : args.files) {
         fs::path file_path(file_path_str);
 
         if (!fs::exists(file_path)) {
@@ -68,27 +118,31 @@ auto main(int argc, char** argv) noexcept -> int {
             continue;
         }
 
-        infile.close(); // Close input file after isBinary check
+        infile.close();  // Close input file after isBinary check
 
         std::string line;
         int total_removed_emoji_count = 0;
         std::ofstream temp_outfile;
-        fs::path temp_file_path; // Declare here for broader scope
+        fs::path temp_file_path;  // Declare here for broader scope
 
-        if (in_place) {
-            // Generate unique temporary filename with PID and timestamp in same directory as original file
+        if (args.in_place) {
+            // Generate unique temporary filename with PID, timestamp and counter in same directory as
+            // original file
+            static int file_counter = 0;
             auto timestamp = std::chrono::high_resolution_clock::now().time_since_epoch().count();
 #ifdef _WIN32
             int pid = _getpid();
 #else
             pid_t pid = getpid();
 #endif
-            std::string temp_filename = file_path.filename().string() + "." + std::to_string(pid) + "." + std::to_string(timestamp) + ".nej_tmp";
+            std::string temp_filename = file_path.filename().string() + "." + std::to_string(pid) +
+                                        "." + std::to_string(timestamp) + "." + std::to_string(++file_counter) + ".nej_tmp";
             temp_file_path = file_path.parent_path() / temp_filename;
 
             temp_outfile.open(temp_file_path);
             if (!temp_outfile.is_open()) {
-                std::cerr << "Error: Could not open temporary file for writing: " << temp_file_path << "\n";
+                std::cerr << "Error: Could not open temporary file for writing: " << temp_file_path
+                          << "\n";
                 continue;
             }
         }
@@ -97,8 +151,8 @@ auto main(int argc, char** argv) noexcept -> int {
         infile.open(file_path);
         if (!infile.is_open()) {
             std::cerr << "Error: Could not re-open file for reading: " << file_path << "\n";
-            if (in_place) {
-                fs::remove(temp_file_path); // Clean up temp file if created
+            if (args.in_place) {
+                fs::remove(temp_file_path);  // Clean up temp file if created
             }
             continue;
         }
@@ -107,21 +161,22 @@ auto main(int argc, char** argv) noexcept -> int {
             auto [processed_line, removed_emoji_count] = removeEmojis(line);
             total_removed_emoji_count += removed_emoji_count;
 
-            if (!dry_run) {
-                if (in_place) {
+            if (!args.dry_run) {
+                if (args.in_place) {
                     temp_outfile << processed_line << '\n';
                 } else {
                     std::cout << processed_line << '\n';
                 }
             }
         }
-        infile.close(); // Close input file after processing
+        infile.close();  // Close input file after processing
 
-        if (in_place) {
-            temp_outfile.close(); // Close temp output file
+        if (args.in_place) {
+            temp_outfile.close();  // Close temp output file
 
             if (!fs::exists(temp_file_path)) {
-                std::cerr << "Error: Temporary file was not created or is empty: " << temp_file_path << "\n";
+                std::cerr << "Error: Temporary file was not created or is empty: " << temp_file_path
+                          << "\n";
                 continue;
             }
 
@@ -129,13 +184,27 @@ auto main(int argc, char** argv) noexcept -> int {
             fs::path backup_path;
 
             // Create backup only if backup extension is provided
-            if (!backup_extension.empty()) {
-                backup_path = file_path;
-                backup_path += backup_extension;
-                int counter = 1;
-                while (fs::exists(backup_path)) {
-                    backup_path = file_path.string() + backup_extension + std::to_string(counter++);
-                }
+            if (!args.backup_extension.empty()) {
+                auto find_unique_backup_path = [](const fs::path& base_path,
+                                                  const std::string& extension) -> fs::path {
+                    std::function<fs::path(const fs::path&, const std::string&, int)> find_path =
+                        [&find_path](const fs::path& base, const std::string& ext,
+                                     int counter) -> fs::path {
+                        auto candidate = base;
+                        candidate += ext + (counter == 0 ? "" : std::to_string(counter));
+
+                        if (!fs::exists(candidate)) {
+                            return candidate;  // Base case
+                        }
+
+                        // Tail call - nothing happens after this return
+                        return find_path(base, ext, counter + 1);
+                    };
+
+                    return find_path(base_path, extension, 0);
+                };
+
+                backup_path = find_unique_backup_path(file_path, args.backup_extension);
 
                 fs::rename(file_path, backup_path, ec);
                 if (ec) {
@@ -157,13 +226,13 @@ auto main(int argc, char** argv) noexcept -> int {
 
             fs::rename(temp_file_path, file_path, ec);
             if (ec) {
-                std::cerr << "Error: Could not rename temporary file to original: " << file_path << ": "
-                          << ec.message() << "\n";
-                if (!backup_extension.empty()) {
+                std::cerr << "Error: Could not rename temporary file to original: " << file_path
+                          << ": " << ec.message() << "\n";
+                if (!args.backup_extension.empty()) {
                     fs::rename(backup_path, file_path, ec);
                     if (ec) {
-                        std::cerr << "Error: Could not restore original file from backup " << backup_path << ": "
-                                  << ec.message() << "\n";
+                        std::cerr << "Error: Could not restore original file from backup "
+                                  << backup_path << ": " << ec.message() << "\n";
                     }
                 }
                 fs::remove(temp_file_path);
@@ -171,9 +240,10 @@ auto main(int argc, char** argv) noexcept -> int {
             }
         }
 
-        if (dry_run) {
+        if (args.dry_run) {
             if (total_removed_emoji_count > 0) {
-                std::cout << "File: " << file_path << ", Emojis removed: " << total_removed_emoji_count << "\n";
+                std::cout << "File: " << file_path
+                          << ", Emojis removed: " << total_removed_emoji_count << "\n";
             } else {
                 std::cout << "File: " << file_path << ", No emojis found.\n";
             }

@@ -28,14 +28,8 @@ if(CMAKE_EXPORT_COMPILE_COMMANDS)
 endif()
 
 # Fetch dependencies
+option(FETCHCONTENT_QUIET "Quiet FetchContent" OFF)
 include(FetchContent)
-
-# Fetch CLI11 (Command Line Interface Library)
-FetchContent_Declare(
-  CLI11
-  GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
-  GIT_TAG        v2.4.2 # Use a specific tag for stability
-)
 
 # Fetch UTF8-CPP (UTF-8 encoding/decoding library)
 FetchContent_Declare(
@@ -44,4 +38,4 @@ FetchContent_Declare(
   GIT_TAG        v4.0.5 # Use a specific tag for stability
 )
 
-FetchContent_MakeAvailable(CLI11 utf8cpp)
+FetchContent_MakeAvailable(utf8cpp)
