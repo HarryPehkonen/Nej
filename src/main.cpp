@@ -25,14 +25,16 @@ auto main(int argc, char** argv) noexcept -> int {
         ->required()
         ->check(CLI::ExistingFile);
 
-    std::string backup_extension = ".bak";
+    std::string backup_extension;
     bool in_place = false;
     bool dry_run = false;
     auto *in_place_option =
         app.add_option(
                "-i,--in-place",
-               "Perform in-place editing with backup. Specify backup extension (e.g., -i.bak)")
-            ->option_text("EXT");
+               backup_extension,
+               "Perform in-place editing. Optionally specify backup extension (e.g., -i.bak)")
+            ->option_text("EXT")
+            ->expected(0, 1);
 
     app.add_flag("--dry-run", dry_run, "Report changes without modifying files.");
 
@@ -44,7 +46,7 @@ auto main(int argc, char** argv) noexcept -> int {
 
     if (in_place_option->count() > 0) {
         in_place = true;
-        backup_extension = in_place_option->as<std::string>();
+        // backup_extension is already set by CLI11 if provided, empty if not
     }
 
     for (const auto& file_path_str : input_files_str) {
@@ -124,31 +126,45 @@ auto main(int argc, char** argv) noexcept -> int {
             }
 
             std::error_code ec;
+            fs::path backup_path;
 
-            // Create unique backup path with incrementing counter if needed
-            fs::path backup_path = file_path;
-            backup_path += backup_extension;
-            int counter = 1;
-            while (fs::exists(backup_path)) {
-                backup_path = file_path.string() + backup_extension + std::to_string(counter++);
-            }
+            // Create backup only if backup extension is provided
+            if (!backup_extension.empty()) {
+                backup_path = file_path;
+                backup_path += backup_extension;
+                int counter = 1;
+                while (fs::exists(backup_path)) {
+                    backup_path = file_path.string() + backup_extension + std::to_string(counter++);
+                }
 
-            fs::rename(file_path, backup_path, ec);
-            if (ec) {
-                std::cerr << "Error: Could not create backup file for " << file_path << ": "
-                          << ec.message() << "\n";
-                fs::remove(temp_file_path);
-                continue;
+                fs::rename(file_path, backup_path, ec);
+                if (ec) {
+                    std::cerr << "Error: Could not create backup file for " << file_path << ": "
+                              << ec.message() << "\n";
+                    fs::remove(temp_file_path);
+                    continue;
+                }
+            } else {
+                // No backup - just remove the original file
+                fs::remove(file_path, ec);
+                if (ec) {
+                    std::cerr << "Error: Could not remove original file " << file_path << ": "
+                              << ec.message() << "\n";
+                    fs::remove(temp_file_path);
+                    continue;
+                }
             }
 
             fs::rename(temp_file_path, file_path, ec);
             if (ec) {
                 std::cerr << "Error: Could not rename temporary file to original: " << file_path << ": "
                           << ec.message() << "\n";
-                fs::rename(backup_path, file_path, ec);
-                if (ec) {
-                    std::cerr << "Error: Could not restore original file from backup " << backup_path << ": "
-                              << ec.message() << "\n";
+                if (!backup_extension.empty()) {
+                    fs::rename(backup_path, file_path, ec);
+                    if (ec) {
+                        std::cerr << "Error: Could not restore original file from backup " << backup_path << ": "
+                                  << ec.message() << "\n";
+                    }
                 }
                 fs::remove(temp_file_path);
                 continue;

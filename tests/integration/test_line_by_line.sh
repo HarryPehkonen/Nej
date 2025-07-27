@@ -77,6 +77,53 @@ else
     exit 1
 fi
 
+# --- Test 3: In-Place Modification Without Backup ---
+echo -n "Test 3: In-Place Modification Without Backup... "
+
+# Create another test file
+INPUT_FILE_NO_BACKUP="${TEST_DIR}/input_no_backup.txt"
+cat <<EOF > "${INPUT_FILE_NO_BACKUP}"
+Hello world!
+This line has an emoji: 👋
+Another line without.
+And one more with multiple: ✨🐛📝
+Final line.
+EOF
+
+"${NEJ_BIN}" -i "${INPUT_FILE_NO_BACKUP}" > /dev/null # Suppress stdout
+
+EXPECTED_CONTENT_NO_BACKUP=$(cat <<EOF
+Hello world!
+This line has an emoji:  
+Another line without.
+And one more with multiple:    
+Final line.
+EOF
+)
+
+ACTUAL_CONTENT_NO_BACKUP=$(cat "${INPUT_FILE_NO_BACKUP}")
+
+if [[ "${ACTUAL_CONTENT_NO_BACKUP}" == "${EXPECTED_CONTENT_NO_BACKUP}" ]]; then
+    echo -e "${GREEN}PASS${NC}"
+else
+    echo -e "${RED}FAIL${NC}"
+    echo "Expected content:"
+    echo "${EXPECTED_CONTENT_NO_BACKUP}"
+    echo "Actual content:"
+    echo "${ACTUAL_CONTENT_NO_BACKUP}"
+    exit 1
+fi
+
+# Verify NO backup file exists
+if [[ ! -f "${INPUT_FILE_NO_BACKUP}.bak" && ! -f "${INPUT_FILE_NO_BACKUP}." ]]; then
+    echo -n "Test 3.1: No backup file created... "
+    echo -e "${GREEN}PASS${NC}"
+else
+    echo -e "${RED}FAIL${NC}"
+    echo "Backup file was unexpectedly created."
+    exit 1
+fi
+
 # --- Test Cleanup ---
 echo "Cleaning up test directory: ${TEST_DIR}"
 rm -rf "${TEST_DIR}"
