@@ -130,7 +130,7 @@ auto main(int argc, char** argv) noexcept -> int {
         std::ofstream temp_outfile;
         fs::path temp_file_path;  // Declare here for broader scope
 
-        if (args.in_place) {
+        if (args.in_place && !args.dry_run) {
             // Generate unique temporary filename with PID, timestamp and counter in same directory as
             // original file
             static int file_counter = 0;
@@ -176,7 +176,7 @@ auto main(int argc, char** argv) noexcept -> int {
         }
         infile.close();  // Close input file after processing
 
-        if (args.in_place) {
+        if (args.in_place && !args.dry_run) {
             temp_outfile.close();  // Close temp output file
 
             if (!fs::exists(temp_file_path)) {
