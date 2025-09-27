@@ -124,6 +124,70 @@ else
     exit 1
 fi
 
+# --- Test 4: Replacement Mode Dry Run ---
+echo -n "Test 4: Replacement Mode Dry Run... "
+
+# Create fresh test file for replacement test
+INPUT_FILE_REPLACE_DRY="${TEST_DIR}/input_replace_dry.txt"
+cat <<EOF > "${INPUT_FILE_REPLACE_DRY}"
+Hello world!
+This line has an emoji: 👋
+Another line without.
+And one more with multiple: ✨🐛📝
+Final line.
+EOF
+
+REPLACE_DRY_RUN_RAW_OUTPUT=$("${NEJ_BIN}" --replace --dry-run "${INPUT_FILE_REPLACE_DRY}" 2>&1 || true)
+REPLACE_DRY_RUN_OUTPUT=$(printf %s "${REPLACE_DRY_RUN_RAW_OUTPUT}" | sed 's/\n$//')
+
+EXPECTED_REPLACE_DRY_RUN_OUTPUT="File: \"${INPUT_FILE_REPLACE_DRY}\", Emojis replaced: 4"
+
+if [[ "${REPLACE_DRY_RUN_OUTPUT}" == "${EXPECTED_REPLACE_DRY_RUN_OUTPUT}" ]]; then
+    echo -e "${GREEN}PASS${NC}"
+else
+    echo -e "${RED}FAIL${NC}"
+    echo "Expected: '${EXPECTED_REPLACE_DRY_RUN_OUTPUT}'"
+    echo "Actual:   '${REPLACE_DRY_RUN_OUTPUT}'"
+    exit 1
+fi
+
+# --- Test 5: Replacement Mode In-Place ---
+echo -n "Test 5: Replacement Mode In-Place... "
+
+# Create test file with specific emojis that have mappings
+INPUT_FILE_REPLACE="${TEST_DIR}/input_replace.txt"
+cat <<EOF > "${INPUT_FILE_REPLACE}"
+Task completed: ✅
+Task failed: ❌
+Warning: ⚠️ Check this
+Launch 🚀 sequence
+Note 📝 this down
+EOF
+
+"${NEJ_BIN}" --replace -i.bak "${INPUT_FILE_REPLACE}" > /dev/null
+
+EXPECTED_REPLACE_CONTENT=$(cat <<EOF
+Task completed: ✓
+Task failed: ✗
+Warning: ⚠ Check this
+Launch → sequence
+Note ※ this down
+EOF
+)
+
+ACTUAL_REPLACE_CONTENT=$(cat "${INPUT_FILE_REPLACE}")
+
+if [[ "${ACTUAL_REPLACE_CONTENT}" == "${EXPECTED_REPLACE_CONTENT}" ]]; then
+    echo -e "${GREEN}PASS${NC}"
+else
+    echo -e "${RED}FAIL${NC}"
+    echo "Expected content:"
+    echo "${EXPECTED_REPLACE_CONTENT}"
+    echo "Actual content:"
+    echo "${ACTUAL_REPLACE_CONTENT}"
+    exit 1
+fi
+
 # --- Test Cleanup ---
 echo "Cleaning up test directory: ${TEST_DIR}"
 rm -rf "${TEST_DIR}"

@@ -26,12 +26,14 @@ void show_help(const char* program_name) {
     std::cout << "  -i, --in-place          Perform in-place editing with no backup\n";
     std::cout << "  --backup-ext EXT        Backup extension for in-place editing (e.g., .bak)\n";
     std::cout << "  --dry-run               Report changes without modifying files\n";
+    std::cout << "  --replace               Replace emojis with Unicode equivalents instead of removing\n";
     std::cout << "  -h, --help              Show this help message and exit\n\n";
     std::cout << "Examples:\n";
     std::cout << "  " << program_name << " file.txt                    # Output to stdout\n";
     std::cout << "  " << program_name << " -i file.txt                 # In-place, no backup\n";
     std::cout << "  " << program_name << " -i --backup-ext .bak file.txt  # In-place with backup\n";
     std::cout << "  " << program_name << " --dry-run *.txt             # Preview changes\n";
+    std::cout << "  " << program_name << " --replace file.txt          # Replace emojis with Unicode\n";
 }
 
 struct Arguments {
@@ -39,6 +41,7 @@ struct Arguments {
     bool in_place = false;
     std::string backup_extension;
     bool dry_run = false;
+    bool replace_mode = false;
     bool help = false;
 };
 
@@ -73,6 +76,8 @@ Arguments parse_arguments(int argc, char** argv) {
             }
         } else if (arg == "--dry-run") {
             args.dry_run = true;
+        } else if (arg == "--replace") {
+            args.replace_mode = true;
         } else if (!arg.empty() && arg[0] == '-') {
             std::cerr << "Error: Unknown option '" << arg << "'\n";
             std::cerr << "Try '" << argv[0] << " --help' for more information.\n";
@@ -158,7 +163,7 @@ auto main(int argc, char** argv) noexcept -> int {
         }
 
         while (std::getline(infile, line)) {
-            auto [processed_line, removed_emoji_count] = removeEmojis(line);
+            auto [processed_line, removed_emoji_count] = args.replace_mode ? replaceEmojis(line) : removeEmojis(line);
             total_removed_emoji_count += removed_emoji_count;
 
             if (!args.dry_run) {
@@ -243,7 +248,7 @@ auto main(int argc, char** argv) noexcept -> int {
         if (args.dry_run) {
             if (total_removed_emoji_count > 0) {
                 std::cout << "File: " << file_path
-                          << ", Emojis removed: " << total_removed_emoji_count << "\n";
+                          << (args.replace_mode ? ", Emojis replaced: " : ", Emojis removed: ") << total_removed_emoji_count << "\n";
             } else {
                 std::cout << "File: " << file_path << ", No emojis found.\n";
             }

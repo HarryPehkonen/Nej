@@ -8,7 +8,7 @@ Nej processes text files to remove emoji sequences while preserving all other Un
 
 ## Features
 
-### ✅ **Strengths & Advantages**
+### ✓ **Strengths & Advantages**
 
 #### **Memory Safety & Modern C++ Design**
 - **RAII (Resource Acquisition Is Initialization)**: All file handles, temporary files, and memory allocations are automatically managed through C++ destructors
@@ -38,7 +38,7 @@ Nej processes text files to remove emoji sequences while preserving all other Un
 - **Clear error messages**: Informative feedback for file access issues, binary file detection, etc.
 - **Flexible operation modes**: Supports dry-run mode, in-place editing, and stdout output
 
-### ⚠️ **Limitations & Considerations**
+### ⚠ **Limitations & Considerations**
 
 #### **Binary File Detection Limitations**
 - **Simple heuristic**: Only checks for null bytes (`\x00`) in the first 4KB of files

@@ -20,4 +20,7 @@ auto isBinary(const fs::path& file_path) -> bool;
 // Function to remove emojis from a UTF-8 string and return the count of removed emojis
 auto removeEmojis(const std::string& text) -> std::pair<std::string, int>;
 
+// Function to replace emojis with Unicode equivalents and return the count of replaced emojis
+auto replaceEmojis(const std::string& text) -> std::pair<std::string, int>;
+
 #endif  // NEJ_CORE_H
